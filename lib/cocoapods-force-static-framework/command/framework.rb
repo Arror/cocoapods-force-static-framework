@@ -16,8 +16,10 @@ module Pod
           should_static = options.delete(Pod::Static.keyword)
           requirements.pop if options.empty?
           pod_name = Specification.root_name(name)
-          @force_static_framework_names ||= []
-          @force_static_framework_names.push pod_name
+          if should_static
+            @force_static_framework_names ||= []
+            @force_static_framework_names.push pod_name
+          end
         end
       end
 
@@ -44,11 +46,11 @@ module Pod
     old_method = instance_method(:initialize)
 
     define_method(:initialize) do |sandbox, host_requires_frameworks, user_build_configurations, archs, platform, specs, target_definitions, file_accessors, scope_suffix, build_type|
-      bt = build_type[:build_type]
-      if target_definitions.first.force_static_framework_names.include?(specs.first.name)
-        bt = Target::BuildType.static_framework
+      reval = build_type[:build_type]
+      if target_definitions.first.force_static_framework_names.include?(Specification.root_name(specs.first.name))
+        reval = Target::BuildType.static_framework
       end
-      old_method.bind(self).(sandbox, host_requires_frameworks, user_build_configurations, archs, platform, specs, target_definitions, file_accessors, scope_suffix, :build_type => bt)
+      old_method.bind(self).(sandbox, host_requires_frameworks, user_build_configurations, archs, platform, specs, target_definitions, file_accessors, scope_suffix, :build_type => reval)
     end
     
   end
