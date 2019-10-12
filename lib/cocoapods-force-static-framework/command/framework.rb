@@ -13,10 +13,10 @@ module Pod
       def parse_force_static_framework(name, requirements)
         options = requirements.last
         if options.is_a?(Hash) && options[Pod::Static.keyword] != nil
-          should_static = options.delete(Pod::Static.keyword)
+          should_force_static = options.delete(Pod::Static.keyword)
           requirements.pop if options.empty?
           pod_name = Specification.root_name(name)
-          if should_static
+          if should_force_static && Pod::Podfile::DSL.force_static_framework_enable
             @force_static_framework_names ||= []
             @force_static_framework_names.push pod_name
           end
@@ -55,4 +55,22 @@ module Pod
     
   end
 
+end
+
+module Pod
+  class Podfile
+    module DSL
+
+      def force_static_framework_enable!
+        @@option_force_static_framework_enable = true
+      end
+
+      def self.force_static_framework_enable
+        @@option_force_static_framework_enable
+      end
+
+      @@option_force_static_framework_enable = false
+
+    end
+  end
 end
