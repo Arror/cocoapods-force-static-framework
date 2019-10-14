@@ -1,76 +1,45 @@
 module Pod
 
-  class Static
-    def self.keyword
-      :static
-    end
+  @@static_frameworks = []
+
+  def self.store_static_framework_names(names)
+    @@static_frameworks = names
   end
 
-  class Podfile
+  def self.static_framework_names
+    @@static_frameworks
+  end
 
-    class TargetDefinition
-
-      def parse_force_static_framework(name, requirements)
-        options = requirements.last
-        if options.is_a?(Hash) && options[Pod::Static.keyword] != nil
-          should_force_static = options.delete(Pod::Static.keyword)
-          requirements.pop if options.empty?
-          pod_name = Specification.root_name(name)
-          if should_force_static && Pod::Podfile::DSL.force_static_framework_enable
-            @force_static_framework_names ||= []
-            @force_static_framework_names.push pod_name
+  class Specification
+    def self.from_string(spec_contents, path, subspec_name = nil)
+      name = ''
+      path = Pathname.new(path).expand_path
+      spec = nil
+      case path.extname
+      when '.podspec'
+        name = File.basename(path, '.podspec')
+        Dir.chdir(path.parent.directory? ? path.parent : Dir.pwd) do
+          spec = ::Pod._eval_podspec(spec_contents, path)
+          unless spec.is_a?(Specification)
+            raise Informative, "Invalid podspec file at path `#{path}`."
           end
         end
+      when '.json'
+        name = File.basename(path, '.podspec.json')
+        spec = Specification.from_json(spec_contents)
+      else
+        raise Informative, "Unsupported specification format `#{path.extname}` for spec at `#{path}`."
       end
-
-      def force_static_framework_names
-        names = @force_static_framework_names || []
-        if parent != nil and parent.kind_of? TargetDefinition
-            names += parent.force_static_framework_names
-        end
-        names
+      if Pod.static_framework_names.include?(name)
+        spec.static_framework = true
       end
-
-      old_method = instance_method(:parse_inhibit_warnings)
-
-      define_method(:parse_inhibit_warnings) do |name, requirements|
-        parse_force_static_framework(name, requirements)
-        old_method.bind(self).(name, requirements)
-      end
-
+      spec.defined_in_file = path
+      spec.subspec_by_name(subspec_name, true)
     end
-  end
-
-  class PodTarget
-
-    old_method = instance_method(:initialize)
-
-    define_method(:initialize) do |sandbox, host_requires_frameworks, user_build_configurations, archs, platform, specs, target_definitions, file_accessors, scope_suffix, build_type|
-      reval = build_type[:build_type]
-      if target_definitions.first.force_static_framework_names.include?(Specification.root_name(specs.first.name))
-        reval = Target::BuildType.static_framework
-      end
-      old_method.bind(self).(sandbox, host_requires_frameworks, user_build_configurations, archs, platform, specs, target_definitions, file_accessors, scope_suffix, :build_type => reval)
-    end
-    
   end
 
 end
 
-module Pod
-  class Podfile
-    module DSL
-
-      def force_static_framework_enable!
-        @@option_force_static_framework_enable = true
-      end
-
-      def self.force_static_framework_enable
-        @@option_force_static_framework_enable
-      end
-
-      @@option_force_static_framework_enable = false
-
-    end
-  end
+Pod::HooksManager.register('cocoapods-force-static-framework', :pre_install) do |context, options|
+  Pod.store_static_framework_names(options[:static_frameworks])
 end
