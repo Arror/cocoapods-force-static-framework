@@ -12,12 +12,10 @@ module Pod
 
   class Specification
     def self.from_string(spec_contents, path, subspec_name = nil)
-      name = ''
       path = Pathname.new(path).expand_path
       spec = nil
       case path.extname
       when '.podspec'
-        name = File.basename(path, '.podspec')
         Dir.chdir(path.parent.directory? ? path.parent : Dir.pwd) do
           spec = ::Pod._eval_podspec(spec_contents, path)
           unless spec.is_a?(Specification)
@@ -25,11 +23,17 @@ module Pod
           end
         end
       when '.json'
-        name = File.basename(path, '.podspec.json')
         spec = Specification.from_json(spec_contents)
       else
         raise Informative, "Unsupported specification format `#{path.extname}` for spec at `#{path}`."
       end
+      name = ''
+      case path.extname
+      when '.podspec'
+        name = File.basename(path, '.podspec')
+      when '.json'
+        name = File.basename(path, '.podspec.json')
+      end  
       if Pod.static_framework_names.include?(name)
         spec.static_framework = true
       end
@@ -41,5 +45,11 @@ module Pod
 end
 
 Pod::HooksManager.register('cocoapods-force-static-framework', :pre_install) do |context, options|
-  Pod.store_static_framework_names(options[:static_frameworks])
+  reval = options[:static_frameworks]
+  if reval and reval.instance_of? Array
+    Pod.store_static_framework_names(reval)
+  else
+    raise Pod::Informative, "请正确设置:static_frameworks, 示例: plugin 'cocoapods-force-static-framework', :static_frameworks => ['RxSwift']"
+  end
+  
 end
