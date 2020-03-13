@@ -8,10 +8,4 @@ A description of cocoapods-force-static-framework.
 
 ## Usage
     
-    plugin 'force_static_framework'
-    
-    force_static_framework_enable!
-    
-    pod 'Sample' do
-        pod 'RxSwift', static => true
-    end
+    plugin 'cocoapods-force-static-framework', :static_frameworks => ['RxSwift']
